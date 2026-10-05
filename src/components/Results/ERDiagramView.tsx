@@ -213,12 +213,12 @@ export const ERDiagramView: React.FC = () => {
   return (
     <div className="h-full w-full relative bg-slate-950 flex flex-col overflow-hidden">
       {/* Top Banner Toolbar */}
-      <div className="h-9 bg-slate-900/90 border-b border-slate-800 px-3 flex items-center justify-between shrink-0 z-10">
-        <div className="flex items-center gap-3 text-xs">
+      <div className="h-9 bg-slate-900/90 border-b border-slate-800 px-2 sm:px-3 flex items-center justify-between shrink-0 z-10 overflow-x-auto no-scrollbar gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 text-xs shrink-0">
           <span className="text-slate-300 font-medium">
-            Entity-Relationship Graph ({tables.length} tables, {edges.length} relationships)
+            ER Graph ({tables.length} tables, {edges.length} relations)
           </span>
-          <span className="text-slate-400">• Drag nodes to rearrange • Zoom with mouse wheel</span>
+          <span className="text-slate-400 hidden md:inline">• Drag nodes • Pinch / wheel to zoom</span>
         </div>
         <Button
           variant="ghost"
@@ -227,7 +227,7 @@ export const ERDiagramView: React.FC = () => {
           onClick={refreshCatalog}
           title="Refresh Catalog Schema"
         >
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
 
@@ -248,7 +248,7 @@ export const ERDiagramView: React.FC = () => {
           <MiniMap
             nodeColor="#059669"
             maskColor="rgba(2, 6, 23, 0.7)"
-            className="bg-slate-950 border border-slate-800 rounded shadow-md"
+            className="!hidden sm:!block bg-slate-950 border border-slate-800 rounded shadow-md"
           />
         </ReactFlow>
       </div>

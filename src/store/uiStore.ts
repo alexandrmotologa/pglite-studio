@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 
 export type ResultTabType = 'table' | 'explain' | 'vector' | 'erd' | 'messages'
+export type MobileViewType = 'editor' | 'results'
 
 export interface JsonInspectorData {
   title: string
@@ -9,6 +10,7 @@ export interface JsonInspectorData {
 
 interface UIState {
   activeResultTab: ResultTabType
+  mobileView: MobileViewType
   isSidebarOpen: boolean
   selectedTable: string | null
   searchCatalog: string
@@ -27,6 +29,7 @@ interface UIState {
 
   // Actions
   setActiveResultTab: (tab: ResultTabType) => void
+  setMobileView: (view: MobileViewType) => void
   toggleSidebar: () => void
   setSelectedTable: (table: string | null) => void
   setSearchCatalog: (query: string) => void
@@ -42,6 +45,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   activeResultTab: 'table',
+  mobileView: 'editor',
   isSidebarOpen: true,
   selectedTable: null,
   searchCatalog: '',
@@ -58,6 +62,7 @@ export const useUIStore = create<UIState>((set) => ({
   vectorAssistantModalOpen: false,
 
   setActiveResultTab: (tab) => set({ activeResultTab: tab }),
+  setMobileView: (view) => set({ mobileView: view }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
   setSelectedTable: (table) => set({ selectedTable: table }),
   setSearchCatalog: (query) => set({ searchCatalog: query }),

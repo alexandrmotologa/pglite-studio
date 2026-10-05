@@ -27,15 +27,31 @@ import LZString from 'lz-string'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 export const App: React.FC = () => {
-  const { init, runQuery, runExplain, status } = useDbStore()
+  const { init, runQuery, runExplain, activeResult } = useDbStore()
   const { getActiveTab, updateSql, addToHistory, getExecutableSql, addTab } = useEditorStore()
-  const { activeResultTab, setActiveResultTab, isSidebarOpen, toggleSidebar } = useUIStore()
+  const {
+    activeResultTab,
+    setActiveResultTab,
+    isSidebarOpen,
+    toggleSidebar,
+    mobileView,
+    setMobileView,
+  } = useUIStore()
 
-  const [editorHeight, setEditorHeight] = useState<number>(45) // percentage
+  const [editorHeight, setEditorHeight] = useState<number>(45) // percentage on desktop
+  const [isMobile, setIsMobile] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.innerWidth < 768
+  )
 
   useEffect(() => {
     // Initialize PostgreSQL engine on mount
     init('main', 'idb')
+
+    // Handle viewport resize for mobile breakpoint
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
 
     // Check for shared SQL fiddle in URL hash
     if (window.location.hash.startsWith('#fiddle=')) {
@@ -52,6 +68,8 @@ export const App: React.FC = () => {
         console.warn('Failed to parse URL fiddle:', err)
       }
     }
+
+    return () => window.removeEventListener('resize', handleResize)
   }, [init, addTab])
 
   const handleRunQuery = async () => {
@@ -71,10 +89,13 @@ export const App: React.FC = () => {
 
       // If user queried vectors, switch to vector tab or keep table
       if (res.hasVectorColumn && activeResultTab !== 'vector') {
-        // Can either keep table or switch
         setActiveResultTab('table')
       } else if (activeResultTab === 'explain') {
         setActiveResultTab('table')
+      }
+      // On mobile, auto-switch to results so user sees data
+      if (isMobile) {
+        setMobileView('results')
       }
     } catch (err: unknown) {
       const duration = performance.now() - start
@@ -85,6 +106,9 @@ export const App: React.FC = () => {
         error: err instanceof Error ? err.message : String(err),
       })
       setActiveResultTab('messages')
+      if (isMobile) {
+        setMobileView('results')
+      }
     }
   }
 
@@ -102,6 +126,9 @@ export const App: React.FC = () => {
         success: true,
       })
       setActiveResultTab('explain')
+      if (isMobile) {
+        setMobileView('results')
+      }
     } catch (err: unknown) {
       const duration = performance.now() - start
       addToHistory({
@@ -111,6 +138,9 @@ export const App: React.FC = () => {
         error: err instanceof Error ? err.message : String(err),
       })
       setActiveResultTab('messages')
+      if (isMobile) {
+        setMobileView('results')
+      }
     }
   }
 
@@ -127,73 +157,156 @@ export const App: React.FC = () => {
 
       {/* Main Workspace Body */}
       <div className="flex-1 flex overflow-hidden relative">
+        {/* Mobile Backdrop Overlay for Sidebar Drawer */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs z-30 md:hidden"
+            onClick={toggleSidebar}
+          />
+        )}
+
         {/* Schema Catalog Sidebar */}
         {isSidebarOpen && <Sidebar />}
 
-        {/* Sidebar Toggle Floating Button */}
+        {/* Desktop Sidebar Toggle Floating Button */}
         <button
           onClick={toggleSidebar}
-          className="absolute z-30 top-2.5 left-2.5 p-1 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100 rounded shadow-md opacity-80 hover:opacity-100 transition-opacity"
+          className="hidden md:flex absolute z-30 top-2.5 p-1 bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100 rounded shadow-md opacity-80 hover:opacity-100 transition-opacity"
           title={isSidebarOpen ? 'Collapse Sidebar' : 'Expand Sidebar'}
           style={{ left: isSidebarOpen ? '17.2rem' : '0.5rem' }}
         >
           {isSidebarOpen ? <PanelLeftClose size={13} /> : <PanelLeftOpen size={13} />}
         </button>
 
-        {/* Center Panel (Editor + Results split) */}
+        {/* Center Panel (Split view on desktop, Tab-switched view on mobile) */}
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top Half: SQL Editor Pane */}
-          <div
-            className="flex flex-col border-b border-slate-800/80 overflow-hidden"
-            style={{ height: `${editorHeight}%` }}
-          >
-            <EditorTabs />
-            <QueryToolbar
-              onRun={handleRunQuery}
-              onExplain={handleExplain}
-              onFormat={handleFormat}
-            />
-            <div className="flex-1 overflow-hidden">
-              <SqlEditor
-                onRun={handleRunQuery}
-                onExplain={handleExplain}
-                onFormat={handleFormat}
+          {/* Mobile View Switcher Segmented Control (< md) */}
+          {isMobile && (
+            <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 border-b border-slate-800 shrink-0">
+              <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs w-full">
+                <button
+                  onClick={() => setMobileView('editor')}
+                  className={`flex-1 py-1 text-center font-medium rounded-md transition-all ${
+                    mobileView === 'editor'
+                      ? 'bg-cyan-500 text-slate-950 shadow font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  SQL Editor
+                </button>
+                <button
+                  onClick={() => setMobileView('results')}
+                  className={`flex-1 py-1 text-center font-medium rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                    mobileView === 'results'
+                      ? 'bg-cyan-500 text-slate-950 shadow font-semibold'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <span>Results Workbench</span>
+                  {activeResult && (
+                    <span
+                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                        mobileView === 'results'
+                          ? 'bg-slate-950 text-cyan-300 font-bold'
+                          : 'bg-slate-800 text-slate-300'
+                      }`}
+                    >
+                      {activeResult.rowCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Desktop Dual-Pane / Mobile Single-Pane Layout */}
+          {isMobile ? (
+            /* Mobile Single Pane Mode */
+            mobileView === 'editor' ? (
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <EditorTabs />
+                <QueryToolbar
+                  onRun={handleRunQuery}
+                  onExplain={handleExplain}
+                  onFormat={handleFormat}
+                />
+                <div className="flex-1 overflow-hidden">
+                  <SqlEditor
+                    onRun={handleRunQuery}
+                    onExplain={handleExplain}
+                    onFormat={handleFormat}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+                <ResultTabs />
+                <div className="flex-1 overflow-hidden relative">
+                  {activeResultTab === 'table' && <DataGrid />}
+                  {activeResultTab === 'explain' && <ExplainPlanView />}
+                  {activeResultTab === 'vector' && <VectorScatterView />}
+                  {activeResultTab === 'erd' && <ERDiagramView />}
+                  {activeResultTab === 'messages' && <MessagesLog />}
+                </div>
+              </div>
+            )
+          ) : (
+            /* Desktop Split Pane Mode */
+            <>
+              {/* Top Half: SQL Editor Pane */}
+              <div
+                className="flex flex-col border-b border-slate-800/80 overflow-hidden"
+                style={{ height: `${editorHeight}%` }}
+              >
+                <EditorTabs />
+                <QueryToolbar
+                  onRun={handleRunQuery}
+                  onExplain={handleExplain}
+                  onFormat={handleFormat}
+                />
+                <div className="flex-1 overflow-hidden">
+                  <SqlEditor
+                    onRun={handleRunQuery}
+                    onExplain={handleExplain}
+                    onFormat={handleFormat}
+                  />
+                </div>
+              </div>
+
+              {/* Draggable Divider */}
+              <div
+                className="h-1 bg-slate-900 hover:bg-cyan-500/60 cursor-row-resize transition-colors flex items-center justify-center shrink-0"
+                onMouseDown={(e) => {
+                  const startY = e.clientY
+                  const startH = editorHeight
+                  const onMove = (moveEvt: MouseEvent) => {
+                    const dy = moveEvt.clientY - startY
+                    const totalH = window.innerHeight - 80
+                    const newPercent = Math.min(80, Math.max(20, startH + (dy / totalH) * 100))
+                    setEditorHeight(newPercent)
+                  }
+                  const onUp = () => {
+                    window.removeEventListener('mousemove', onMove)
+                    window.removeEventListener('mouseup', onUp)
+                  }
+                  window.addEventListener('mousemove', onMove)
+                  window.addEventListener('mouseup', onUp)
+                }}
               />
-            </div>
-          </div>
 
-          {/* Draggable Divider */}
-          <div
-            className="h-1 bg-slate-900 hover:bg-cyan-500/60 cursor-row-resize transition-colors flex items-center justify-center shrink-0"
-            onMouseDown={(e) => {
-              const startY = e.clientY
-              const startH = editorHeight
-              const onMove = (moveEvt: MouseEvent) => {
-                const dy = moveEvt.clientY - startY
-                const totalH = window.innerHeight - 80
-                const newPercent = Math.min(80, Math.max(20, startH + (dy / totalH) * 100))
-                setEditorHeight(newPercent)
-              }
-              const onUp = () => {
-                window.removeEventListener('mousemove', onMove)
-                window.removeEventListener('mouseup', onUp)
-              }
-              window.addEventListener('mousemove', onMove)
-              window.addEventListener('mouseup', onUp)
-            }}
-          />
-
-          {/* Bottom Half: Workbench Results Viewport */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
-            <ResultTabs />
-            <div className="flex-1 overflow-hidden relative">
-              {activeResultTab === 'table' && <DataGrid />}
-              {activeResultTab === 'explain' && <ExplainPlanView />}
-              {activeResultTab === 'vector' && <VectorScatterView />}
-              {activeResultTab === 'erd' && <ERDiagramView />}
-              {activeResultTab === 'messages' && <MessagesLog />}
-            </div>
-          </div>
+              {/* Bottom Half: Workbench Results Viewport */}
+              <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+                <ResultTabs />
+                <div className="flex-1 overflow-hidden relative">
+                  {activeResultTab === 'table' && <DataGrid />}
+                  {activeResultTab === 'explain' && <ExplainPlanView />}
+                  {activeResultTab === 'vector' && <VectorScatterView />}
+                  {activeResultTab === 'erd' && <ERDiagramView />}
+                  {activeResultTab === 'messages' && <MessagesLog />}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

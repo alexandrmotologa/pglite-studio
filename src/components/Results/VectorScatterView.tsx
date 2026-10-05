@@ -317,6 +317,28 @@ export const VectorScatterView: React.FC = () => {
     isDraggingRef.current = false
   }
 
+  // Touch interaction for mobile / tablet rotation
+  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (mode === '3d' && e.touches.length > 0) {
+      isDraggingRef.current = true
+      lastMousePosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (isDraggingRef.current && mode === '3d' && e.touches.length > 0) {
+      const dx = e.touches[0].clientX - lastMousePosRef.current.x
+      const dy = e.touches[0].clientY - lastMousePosRef.current.y
+      setRotY((y) => y + dx * 0.01)
+      setRotX((x) => x + dy * 0.01)
+      lastMousePosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    }
+  }
+
+  const handleTouchEnd = () => {
+    isDraggingRef.current = false
+  }
+
   const handleClick = () => {
     if (hoveredPoint) {
       setSelectedPoint(hoveredPoint)
@@ -373,37 +395,38 @@ SELECT id, title, category, embedding FROM articles;
   return (
     <div className="h-full flex flex-col bg-slate-950 overflow-hidden select-none">
       {/* Top Toolbar */}
-      <div className="h-10 px-4 border-b border-slate-800/80 bg-slate-900/60 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      <div className="h-10 px-3 sm:px-4 border-b border-slate-800/80 bg-slate-900/60 flex items-center justify-between shrink-0 overflow-x-auto no-scrollbar gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Projection Mode Toggle */}
           <div className="flex items-center bg-slate-950 p-0.5 rounded-md border border-slate-800">
             <button
               onClick={() => setMode('2d')}
-              className={`px-2.5 py-1 text-xs rounded font-medium flex items-center gap-1 transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 text-xs rounded font-medium flex items-center gap-1 transition-colors ${
                 mode === '2d' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
               }`}
             >
               <CircleDot size={12} />
-              2D PCA
+              <span>2D PCA</span>
             </button>
             <button
               onClick={() => setMode('3d')}
-              className={`px-2.5 py-1 text-xs rounded font-medium flex items-center gap-1 transition-colors ${
+              className={`px-2 sm:px-2.5 py-1 text-xs rounded font-medium flex items-center gap-1 transition-colors ${
                 mode === '3d' ? 'bg-cyan-500/20 text-cyan-400' : 'text-slate-400 hover:text-white'
               }`}
             >
               <Box size={12} />
-              3D Interactive
+              <span className="hidden sm:inline">3D Interactive</span>
+              <span className="sm:hidden">3D</span>
             </button>
           </div>
 
           {/* Vector Column Selector */}
           <div className="flex items-center gap-1 text-xs text-slate-400">
-            <span>Vector Col:</span>
+            <span className="hidden sm:inline">Vector Col:</span>
             <select
               value={selectedCol}
               onChange={(e) => setSelectedCol(e.target.value)}
-              className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-200 rounded focus:outline-none focus:border-cyan-500 font-mono text-xs"
+              className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-200 rounded focus:outline-none focus:border-cyan-500 font-mono text-xs max-w-28 sm:max-w-none truncate"
             >
               {vectorColumns.map((c) => (
                 <option key={c} value={c}>
@@ -416,11 +439,11 @@ SELECT id, title, category, embedding FROM articles;
           {/* Color by Categorical Column */}
           {categoricalColumns.length > 0 && (
             <div className="flex items-center gap-1 text-xs text-slate-400">
-              <span>Color By:</span>
+              <span className="hidden sm:inline">Color By:</span>
               <select
                 value={colorByCol}
                 onChange={(e) => setColorByCol(e.target.value)}
-                className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-200 rounded focus:outline-none focus:border-cyan-500 text-xs"
+                className="px-2 py-0.5 bg-slate-950 border border-slate-800 text-slate-200 rounded focus:outline-none focus:border-cyan-500 text-xs max-w-28 sm:max-w-none truncate"
               >
                 <option value="">Cluster (Auto)</option>
                 {categoricalColumns.map((c) => (
@@ -435,7 +458,7 @@ SELECT id, title, category, embedding FROM articles;
 
         {/* PCA Metric Badges */}
         {pcaResult && (
-          <div className="flex items-center gap-2 text-xs">
+          <div className="hidden md:flex items-center gap-2 text-xs shrink-0">
             <span className="text-slate-500 text-[11px]">
               Dim: <span className="font-mono text-slate-300">{pcaResult.totalDimensions}</span>
             </span>
@@ -467,6 +490,9 @@ SELECT id, title, category, embedding FROM articles;
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           onClick={handleClick}
           className="w-full h-full cursor-crosshair"
         />
@@ -475,7 +501,8 @@ SELECT id, title, category, embedding FROM articles;
         {mode === '3d' && (
           <div className="absolute top-3 left-3 bg-slate-900/80 border border-slate-800 rounded px-2 py-1 text-[11px] text-slate-400 flex items-center gap-1.5 backdrop-blur-xs">
             <Compass size={12} className="text-cyan-400" />
-            <span>Click & drag to rotate 3D space</span>
+            <span className="hidden sm:inline">Click & drag to rotate 3D space</span>
+            <span className="sm:hidden">Drag to rotate 3D</span>
           </div>
         )}
 
@@ -513,7 +540,7 @@ SELECT id, title, category, embedding FROM articles;
 
         {/* Selected Point Nearest Neighbors Sidebar */}
         {selectedPoint && (
-          <div className="w-72 bg-slate-900/90 border-l border-slate-800 p-3.5 flex flex-col gap-3 shadow-xl backdrop-blur-xs overflow-y-auto">
+          <div className="absolute md:relative inset-y-0 right-0 w-72 max-w-[85vw] h-full bg-slate-900/95 border-l border-slate-800 p-3.5 flex flex-col gap-3 shadow-2xl backdrop-blur-md overflow-y-auto z-30 animate-in slide-in-from-right duration-150">
             <div className="flex items-center justify-between pb-2 border-b border-slate-800">
               <div>
                 <h4 className="text-xs font-semibold text-slate-100">Cosine KNN Inspector</h4>
@@ -521,7 +548,7 @@ SELECT id, title, category, embedding FROM articles;
               </div>
               <button
                 onClick={() => setSelectedPoint(null)}
-                className="text-xs text-slate-400 hover:text-white"
+                className="text-xs text-slate-400 hover:text-white p-1"
               >
                 ✕
               </button>

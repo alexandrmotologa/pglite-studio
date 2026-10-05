@@ -173,30 +173,30 @@ export const ExplainPlanView: React.FC = () => {
           <MiniMap
             nodeColor="#475569"
             maskColor="rgba(3, 7, 18, 0.7)"
-            className="!bg-slate-900 !border-slate-800"
+            className="!hidden sm:!block !bg-slate-900 !border-slate-800"
           />
         </ReactFlow>
       </div>
 
       {/* Overview Metric Banner (Top Left) */}
-      <div className="absolute top-3 left-3 z-10 bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 shadow-lg backdrop-blur-xs flex items-center gap-4 text-xs select-none">
+      <div className="absolute top-3 left-3 z-10 bg-slate-900/90 border border-slate-800 rounded-lg p-2 sm:p-2.5 shadow-lg backdrop-blur-xs flex items-center gap-2.5 sm:gap-4 text-xs select-none max-w-[calc(100%-1.5rem)] overflow-x-auto no-scrollbar">
         <div>
-          <span className="text-slate-500 block text-[10px]">EXECUTION TIME</span>
-          <span className="font-mono text-emerald-400 font-semibold text-sm">
+          <span className="text-slate-500 block text-[9px] sm:text-[10px]">EXECUTION TIME</span>
+          <span className="font-mono text-emerald-400 font-semibold text-xs sm:text-sm">
             {dag.totalExecutionTime}ms
           </span>
         </div>
         <div className="h-6 w-px bg-slate-800" />
         <div>
-          <span className="text-slate-500 block text-[10px]">PLANNING TIME</span>
-          <span className="font-mono text-cyan-400 font-semibold text-sm">
+          <span className="text-slate-500 block text-[9px] sm:text-[10px]">PLANNING TIME</span>
+          <span className="font-mono text-cyan-400 font-semibold text-xs sm:text-sm">
             {dag.totalPlanningTime}ms
           </span>
         </div>
         <div className="h-6 w-px bg-slate-800" />
         <div>
-          <span className="text-slate-500 block text-[10px]">TOTAL PLAN NODES</span>
-          <span className="font-mono text-slate-200 font-semibold text-sm">
+          <span className="text-slate-500 block text-[9px] sm:text-[10px]">PLAN NODES</span>
+          <span className="font-mono text-slate-200 font-semibold text-xs sm:text-sm">
             {dag.nodes.length}
           </span>
         </div>
@@ -204,7 +204,7 @@ export const ExplainPlanView: React.FC = () => {
 
       {/* Selected Node Details Drawer (Right) */}
       {selectedNodeData && (
-        <div className="w-80 h-full bg-slate-900 border-l border-slate-800 p-4 overflow-y-auto z-20 flex flex-col gap-3 shadow-2xl">
+        <div className="absolute md:relative inset-y-0 right-0 w-80 max-w-[85vw] h-full bg-slate-900/98 border-l border-slate-800 p-4 overflow-y-auto z-20 flex flex-col gap-3 shadow-2xl backdrop-blur-md animate-in slide-in-from-right duration-150">
           <div className="flex items-center justify-between pb-2 border-b border-slate-800">
             <div>
               <h4 className="text-sm font-semibold text-slate-100">{selectedNodeData.nodeType}</h4>

@@ -1,5 +1,5 @@
 import React from 'react'
-import { clsx } from 'clsx'
+import { cn } from '../../utils/cn'
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline'
@@ -36,7 +36,7 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
-      className={clsx(baseClasses, variantClasses[variant], sizeClasses[size], className)}
+      className={cn(baseClasses, variantClasses[variant], sizeClasses[size], className)}
       disabled={disabled}
       {...props}
     >
@@ -45,3 +45,5 @@ export const Button: React.FC<ButtonProps> = ({
     </button>
   )
 }
+
+export default Button

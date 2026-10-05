@@ -14,6 +14,7 @@ import {
   Layers,
   Box,
   Binary,
+  X,
 } from 'lucide-react'
 import { useDbStore } from '../../store/dbStore'
 import { useEditorStore } from '../../store/editorStore'
@@ -24,7 +25,7 @@ import { Badge } from '../UI/Badge'
 export const Sidebar: React.FC = () => {
   const { catalog, refreshCatalog, runQuery } = useDbStore()
   const { addTab } = useEditorStore()
-  const { setMockModalOpen } = useUIStore()
+  const { setMockModalOpen, toggleSidebar } = useUIStore()
 
   const [search, setSearch] = useState('')
   const [expandedTables, setExpandedTables] = useState<Record<string, boolean>>({})
@@ -43,6 +44,9 @@ export const Sidebar: React.FC = () => {
   const handleSelectTable = (table: TableSchema) => {
     const sql = `SELECT * FROM "${table.name}" LIMIT 50;`
     addTab(`${table.name}.sql`, sql)
+    if (window.innerWidth < 768) {
+      toggleSidebar()
+    }
   }
 
   const handleInsertTemplate = (table: TableSchema) => {
@@ -53,6 +57,9 @@ export const Sidebar: React.FC = () => {
       .join(', ')
     const sql = `INSERT INTO "${table.name}" (${colNames})\nVALUES (${placeholders});`
     addTab(`insert_${table.name}.sql`, sql)
+    if (window.innerWidth < 768) {
+      toggleSidebar()
+    }
   }
 
   const handleDropTable = async (table: TableSchema) => {
@@ -68,8 +75,8 @@ export const Sidebar: React.FC = () => {
   )
 
   return (
-    <aside className="w-68 bg-slate-950 border-r border-slate-800/80 flex flex-col shrink-0 overflow-hidden select-none">
-      {/* Search & Refresh bar */}
+    <aside className="fixed md:static inset-y-0 left-0 z-40 w-72 md:w-68 max-w-[85vw] h-full bg-slate-950/98 md:bg-slate-950 backdrop-blur-md md:backdrop-blur-none border-r border-slate-800/80 flex flex-col shrink-0 overflow-hidden select-none shadow-2xl md:shadow-none animate-in slide-in-from-left duration-150 md:animate-none">
+      {/* Search & Refresh bar + Mobile Close button */}
       <div className="p-2.5 border-b border-slate-800/80 flex items-center gap-1.5 bg-slate-950">
         <div className="relative flex-1">
           <Search size={13} className="absolute left-2.5 top-2 text-slate-500 pointer-events-none" />
@@ -89,6 +96,13 @@ export const Sidebar: React.FC = () => {
           title="Refresh schema catalog"
         >
           <RefreshCw size={13} />
+        </button>
+        <button
+          onClick={toggleSidebar}
+          className="md:hidden p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-900 rounded transition-colors"
+          title="Close schema sidebar"
+        >
+          <X size={14} />
         </button>
       </div>
 
