@@ -50,6 +50,7 @@ export const Modal: React.FC<ModalProps> = ({
             {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
           </div>
           <button
+            data-modal-close="true"
             onClick={onClose}
             className="p-1 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded transition-colors"
           >

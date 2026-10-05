@@ -2,7 +2,19 @@
 
 Client-side PostgreSQL 16 and pgvector workbench running entirely in browser WebAssembly via ElectricSQL's PGlite.
 
+![PGLite-Studio Demo](docs/images/pglite_studio_demo.gif)
+
 PGLite-Studio lets developers prototype schemas, test vector similarity queries, analyze execution plans, and test database migrations without starting local Docker containers or sending data to remote database instances.
+
+## Screenshots
+
+| Visual EXPLAIN Plan DAG | 2D/3D PCA Vector Scatter |
+| :---: | :---: |
+| ![EXPLAIN DAG](docs/images/pglite-studio-2.png) | ![Vector Scatter](docs/images/pglite-studio-3.png) |
+
+| Interactive Data Grid | Sample Queries & Presets |
+| :---: | :---: |
+| ![Data Grid](docs/images/pglite-studio-1.png) | ![Sample Queries](docs/images/pglite-studio-4.png) |
 
 ## Highlights
 

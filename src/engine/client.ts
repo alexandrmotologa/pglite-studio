@@ -125,14 +125,24 @@ export class PGLiteClient {
     })
   }
 
+  private initPromise: Promise<void> | null = null
+
   public async init(branchId = 'main', storageType: 'idb' | 'memory' = 'idb'): Promise<void> {
+    if (this.initPromise && this.currentBranch === branchId && this.currentStorage === storageType) {
+      return this.initPromise
+    }
     this.currentBranch = branchId
     this.currentStorage = storageType
-    await this.send<WorkerResponse>({
-      type: 'INIT',
-      branchId,
-      storageType,
+    this.initPromise = (async () => {
+      await this.send<WorkerResponse>({
+        type: 'INIT',
+        branchId,
+        storageType,
+      })
+    })().finally(() => {
+      this.initPromise = null
     })
+    return this.initPromise
   }
 
   public async query(sql: string): Promise<QueryResult> {

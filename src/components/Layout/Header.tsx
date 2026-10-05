@@ -79,6 +79,7 @@ export const Header: React.FC = () => {
           </div>
 
           <Button
+            data-action="snapshots"
             variant="ghost"
             size="xs"
             onClick={() => setBranchModalOpen(true)}
@@ -92,6 +93,7 @@ export const Header: React.FC = () => {
       {/* Action Toolbar */}
       <div className="flex items-center gap-2">
         <Button
+          data-action="sample-demos"
           variant="secondary"
           size="xs"
           icon={<BookOpen size={13} className="text-cyan-400" />}
@@ -101,6 +103,7 @@ export const Header: React.FC = () => {
         </Button>
 
         <Button
+          data-action="history"
           variant="secondary"
           size="xs"
           icon={<History size={13} className="text-slate-400" />}
@@ -112,6 +115,7 @@ export const Header: React.FC = () => {
         <div className="h-4 w-px bg-slate-800" />
 
         <Button
+          data-action="export-sql"
           variant="secondary"
           size="xs"
           icon={<Download size={13} className="text-slate-400" />}
@@ -121,6 +125,7 @@ export const Header: React.FC = () => {
         </Button>
 
         <Button
+          data-action="reset-db"
           variant="ghost"
           size="xs"
           icon={<RotateCcw size={13} className="text-slate-400" />}

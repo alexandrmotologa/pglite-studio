@@ -98,8 +98,8 @@ export const useDbStore = create<DbState>((set, get) => ({
         'success'
       )
 
-      // Refresh catalog if DDL command
-      if (/^\s*(CREATE|ALTER|DROP|TRUNCATE)/i.test(trimmed)) {
+      // Refresh catalog if any DDL/schema modifying statement
+      if (/(CREATE|ALTER|DROP|TRUNCATE|INSERT)/i.test(trimmed)) {
         await get().refreshCatalog()
       }
 

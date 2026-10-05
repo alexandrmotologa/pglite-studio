@@ -17,6 +17,7 @@ export const ResultTabs: React.FC = () => {
       <div className="flex items-center gap-1">
         {/* Table View */}
         <button
+          data-tab="table"
           onClick={() => setActiveResultTab('table')}
           className={`h-7 px-3 flex items-center gap-1.5 rounded-t-md text-xs cursor-pointer border-t-2 transition-all ${
             activeResultTab === 'table'
@@ -35,6 +36,7 @@ export const ResultTabs: React.FC = () => {
 
         {/* Visual Explain Plan */}
         <button
+          data-tab="explain"
           onClick={() => setActiveResultTab('explain')}
           className={`h-7 px-3 flex items-center gap-1.5 rounded-t-md text-xs cursor-pointer border-t-2 transition-all ${
             activeResultTab === 'explain'
@@ -56,6 +58,7 @@ export const ResultTabs: React.FC = () => {
 
         {/* Vector Embedding Visualizer */}
         <button
+          data-tab="vector"
           onClick={() => setActiveResultTab('vector')}
           className={`h-7 px-3 flex items-center gap-1.5 rounded-t-md text-xs cursor-pointer border-t-2 transition-all ${
             activeResultTab === 'vector'
@@ -77,6 +80,7 @@ export const ResultTabs: React.FC = () => {
 
         {/* Messages / Console Logs */}
         <button
+          data-tab="messages"
           onClick={() => setActiveResultTab('messages')}
           className={`h-7 px-3 flex items-center gap-1.5 rounded-t-md text-xs cursor-pointer border-t-2 transition-all ${
             activeResultTab === 'messages'

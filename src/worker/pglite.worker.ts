@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite'
-import { vector } from '@electric-sql/pglite-pgvector'
+import type { Extension } from '@electric-sql/pglite'
 import { DatabaseCatalog, QueryResult, TableSchema, ColumnMeta, IndexMeta } from '../types/database'
 import { PostgresExplainOutput } from '../types/explain'
 import { WorkerRequest, WorkerResponse } from '../types/messages'
@@ -7,6 +7,18 @@ import { WorkerRequest, WorkerResponse } from '../types/messages'
 let db: PGlite | null = null
 let currentBranchId = 'main'
 let currentStorageType: 'idb' | 'memory' = 'idb'
+
+// Custom vector extension loader resolving from /vector.pkg in public root
+const vectorExtension: Extension = {
+  name: 'vector',
+  setup: async (_pg, emscriptenOpts) => {
+    const bundleUrl = new URL('/vector.pkg', self.location.origin)
+    return {
+      emscriptenOpts,
+      bundlePath: bundleUrl,
+    }
+  },
+}
 
 function sendResponse(res: WorkerResponse) {
   postMessage(res)
@@ -27,6 +39,43 @@ function detectVectorValue(val: unknown): boolean {
   return false
 }
 
+function stripComments(sql: string): string {
+  let s = sql.replace(/--.*$/gm, '')
+  s = s.replace(/\/\*[\s\S]*?\*\//g, '')
+  return s.trim()
+}
+
+function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = []
+  let current = ''
+  let inSingleQuote = false
+  let inDoubleQuote = false
+
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i]
+    if (ch === "'" && (i === 0 || sql[i - 1] !== '\\')) {
+      inSingleQuote = !inSingleQuote
+      current += ch
+    } else if (ch === '"' && (i === 0 || sql[i - 1] !== '\\')) {
+      inDoubleQuote = !inDoubleQuote
+      current += ch
+    } else if (ch === ';' && !inSingleQuote && !inDoubleQuote) {
+      if (current.trim().length > 0) {
+        statements.push(current.trim())
+      }
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+
+  if (current.trim().length > 0) {
+    statements.push(current.trim())
+  }
+
+  return statements
+}
+
 async function initDatabase(branchId: string, storageType: 'idb' | 'memory') {
   if (db) {
     try {
@@ -44,7 +93,7 @@ async function initDatabase(branchId: string, storageType: 'idb' | 'memory') {
   try {
     db = new PGlite(dataDir, {
       extensions: {
-        vector,
+        vector: vectorExtension,
       },
     })
 
@@ -72,11 +121,23 @@ async function runQuery(id: string, sql: string) {
 
   const start = performance.now()
   try {
-    const trimmed = sql.trim()
-    const isSelect = /^(\s*SELECT|\s*WITH|\s*VALUES|\s*TABLE|\s*EXPLAIN)/i.test(trimmed)
+    const statements = splitSqlStatements(sql)
+    if (statements.length === 0) {
+      throw new Error('No SQL statements found to execute')
+    }
+
+    const lastStmt = statements[statements.length - 1]
+    const strippedLast = stripComments(lastStmt)
+    const isSelect = /^(\s*SELECT|\s*WITH|\s*VALUES|\s*TABLE|\s*EXPLAIN)/i.test(strippedLast)
+
+    // Execute preceding statements if any
+    if (statements.length > 1) {
+      const preceding = statements.slice(0, -1).join(';\n') + ';'
+      await db.exec(preceding)
+    }
 
     if (isSelect) {
-      const res = await db.query(trimmed)
+      const res = await db.query(lastStmt)
       const duration = performance.now() - start
 
       const columns = res.fields.map((f) => f.name)
@@ -104,8 +165,7 @@ async function runQuery(id: string, sql: string) {
 
       sendResponse({ type: 'QUERY_OK', id, result: queryResult })
     } else {
-      // DDL or DML statements (CREATE, INSERT, UPDATE, DELETE, ALTER, etc.)
-      await db.exec(trimmed)
+      await db.exec(lastStmt)
       const duration = performance.now() - start
 
       const queryResult: QueryResult = {
@@ -132,19 +192,29 @@ async function runExplain(id: string, sql: string) {
 
   const start = performance.now()
   try {
-    let cleanSql = sql.trim()
-    // Strip trailing semicolon
-    if (cleanSql.endsWith(';')) {
-      cleanSql = cleanSql.slice(0, -1).trim()
+    const statements = splitSqlStatements(sql)
+    if (statements.length === 0) {
+      throw new Error('No SQL statements found to explain')
     }
 
-    if (!/^EXPLAIN/i.test(cleanSql)) {
-      cleanSql = `EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ${cleanSql}`
-    } else if (!/FORMAT\s+JSON/i.test(cleanSql)) {
-      cleanSql = cleanSql.replace(/EXPLAIN/i, 'EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON)')
+    // Execute preceding setup queries if multi-statement script
+    if (statements.length > 1) {
+      const preceding = statements.slice(0, -1).join(';\n') + ';'
+      await db.exec(preceding)
     }
 
-    const res = await db.query(cleanSql)
+    let targetSql = stripComments(statements[statements.length - 1])
+    if (targetSql.endsWith(';')) {
+      targetSql = targetSql.slice(0, -1).trim()
+    }
+
+    if (!/^EXPLAIN/i.test(targetSql)) {
+      targetSql = `EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON) ${targetSql}`
+    } else if (!/FORMAT\s+JSON/i.test(targetSql)) {
+      targetSql = targetSql.replace(/EXPLAIN/i, 'EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON)')
+    }
+
+    const res = await db.query(targetSql)
     const duration = performance.now() - start
 
     if (res.rows.length === 0) {
