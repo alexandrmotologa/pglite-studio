@@ -1,16 +1,17 @@
 import React from 'react'
-import { Table, Network, ScatterChart, Terminal } from 'lucide-react'
-import { useUIStore, ResultTabType } from '../../store/uiStore'
+import { Table, Network, ScatterChart, Terminal, GitFork } from 'lucide-react'
+import { useUIStore } from '../../store/uiStore'
 import { useDbStore } from '../../store/dbStore'
 import { Badge } from '../UI/Badge'
 
 export const ResultTabs: React.FC = () => {
   const { activeResultTab, setActiveResultTab } = useUIStore()
-  const { activeResult, activeExplain, logs } = useDbStore()
+  const { activeResult, activeExplain, logs, catalog } = useDbStore()
 
   const hasVectors = !!activeResult?.hasVectorColumn
   const rowCount = activeResult?.rowCount ?? 0
   const hasExplain = !!activeExplain
+  const tableCount = catalog?.tables.length ?? 0
 
   return (
     <div className="h-9 bg-slate-950 border-b border-slate-800/80 px-3 flex items-center justify-between shrink-0 select-none">
@@ -74,6 +75,28 @@ export const ResultTabs: React.FC = () => {
           {hasVectors && (
             <Badge variant="cyan" size="xs">
               PCA
+            </Badge>
+          )}
+        </button>
+
+        {/* Entity Relationship Diagram */}
+        <button
+          data-tab="erd"
+          onClick={() => setActiveResultTab('erd')}
+          className={`h-7 px-3 flex items-center gap-1.5 rounded-t-md text-xs cursor-pointer border-t-2 transition-all ${
+            activeResultTab === 'erd'
+              ? 'bg-slate-900 text-slate-100 border-emerald-400 font-medium'
+              : 'text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-900/60'
+          }`}
+        >
+          <GitFork
+            size={13}
+            className={activeResultTab === 'erd' ? 'text-emerald-400' : 'text-slate-500'}
+          />
+          <span>ER Diagram</span>
+          {tableCount > 0 && (
+            <Badge variant="emerald" size="xs">
+              {tableCount}
             </Badge>
           )}
         </button>

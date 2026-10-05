@@ -1,5 +1,5 @@
 import React from 'react'
-import { Play, Network, StopCircle, AlignLeft, Trash2, Zap } from 'lucide-react'
+import { Play, Network, StopCircle, AlignLeft, Trash2, Zap, CheckSquare, Dna } from 'lucide-react'
 import { Button } from '../UI/Button'
 import { useDbStore } from '../../store/dbStore'
 import { useEditorStore } from '../../store/editorStore'
@@ -13,8 +13,10 @@ interface QueryToolbarProps {
 
 export const QueryToolbar: React.FC<QueryToolbarProps> = ({ onRun, onExplain, onFormat }) => {
   const { status, cancelQuery } = useDbStore()
-  const { updateSql } = useEditorStore()
+  const { updateSql, selectedText } = useEditorStore()
+  const { setVectorAssistantModalOpen } = useUIStore()
   const isRunning = status === 'running'
+  const hasSelection = selectedText.trim().length > 0
 
   return (
     <div className="h-10 bg-slate-900 border-b border-slate-800/80 px-3 flex items-center justify-between shrink-0 select-none">
@@ -32,11 +34,21 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({ onRun, onExplain, on
           <Button
             variant="primary"
             size="xs"
-            icon={<Play size={13} className="fill-slate-950" />}
+            icon={
+              hasSelection ? (
+                <CheckSquare size={13} className="text-slate-950" />
+              ) : (
+                <Play size={13} className="fill-slate-950" />
+              )
+            }
             onClick={onRun}
-            title="Execute SQL (Ctrl+Enter)"
+            title={
+              hasSelection
+                ? 'Execute Selected SQL (Ctrl+Enter)'
+                : 'Execute SQL Query (Ctrl+Enter)'
+            }
           >
-            Run
+            {hasSelection ? 'Run Selection' : 'Run'}
           </Button>
         )}
 
@@ -46,9 +58,23 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({ onRun, onExplain, on
           icon={<Network size={13} className="text-cyan-400" />}
           onClick={onExplain}
           disabled={isRunning}
-          title="Analyze Execution Plan (Ctrl+E)"
+          title={
+            hasSelection
+              ? 'Analyze Execution Plan of Selection (Ctrl+E)'
+              : 'Analyze Execution Plan (Ctrl+E)'
+          }
         >
-          Explain Plan
+          {hasSelection ? 'Explain Selection' : 'Explain Plan'}
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="xs"
+          icon={<Dna size={13} className="text-cyan-400" />}
+          onClick={() => setVectorAssistantModalOpen(true)}
+          title="pgvector AI Assistant & Geometric Calculator"
+        >
+          Vector AI
         </Button>
 
         <div className="h-4 w-px bg-slate-800 mx-1" />
@@ -58,7 +84,7 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({ onRun, onExplain, on
           size="xs"
           icon={<AlignLeft size={13} />}
           onClick={onFormat}
-          title="Format SQL"
+          title="Format SQL (Ctrl+Shift+F)"
         >
           Format
         </Button>
@@ -72,6 +98,12 @@ export const QueryToolbar: React.FC<QueryToolbarProps> = ({ onRun, onExplain, on
         >
           Clear
         </Button>
+
+        {hasSelection && (
+          <span className="text-[11px] bg-cyan-950/80 text-cyan-400 px-2 py-0.5 rounded border border-cyan-800/60 font-mono">
+            {selectedText.trim().split('\n').length} line(s) selected
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2 text-xs text-slate-400">

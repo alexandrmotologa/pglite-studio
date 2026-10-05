@@ -1,34 +1,54 @@
-import React from 'react'
+import React, { useState } from 'react'
 import {
-  Database,
   GitBranch,
   BookOpen,
   Download,
   Upload,
   History,
   RotateCcw,
-  Sparkles,
   ChevronDown,
   Cpu,
+  Share2,
+  Check,
 } from 'lucide-react'
+import LZString from 'lz-string'
 import { Button } from '../UI/Button'
 import { Badge } from '../UI/Badge'
 import { useDbStore } from '../../store/dbStore'
 import { useUIStore } from '../../store/uiStore'
+import { useEditorStore } from '../../store/editorStore'
 
 export const Header: React.FC = () => {
-  const { activeBranch, branches, switchBranch, status, init, storageType } = useDbStore()
+  const { activeBranch, branches, switchBranch, init, storageType } = useDbStore()
   const {
     setBranchModalOpen,
     setExportModalOpen,
     setSamplesModalOpen,
     setHistoryModalOpen,
+    setImportModalOpen,
   } = useUIStore()
+  const { getActiveTab } = useEditorStore()
+
+  const [copiedFiddle, setCopiedFiddle] = useState(false)
 
   const handleReset = async () => {
     if (confirm(`Reset branch '${activeBranch}' to an empty database state?`)) {
       await init(activeBranch, storageType)
     }
+  }
+
+  const handleShareFiddle = () => {
+    const activeTab = getActiveTab()
+    const payload = {
+      title: activeTab.title,
+      sql: activeTab.sql,
+    }
+    const compressed = LZString.compressToEncodedURIComponent(JSON.stringify(payload))
+    const shareUrl = `${window.location.origin}${window.location.pathname}#fiddle=${compressed}`
+
+    navigator.clipboard.writeText(shareUrl)
+    setCopiedFiddle(true)
+    setTimeout(() => setCopiedFiddle(false), 2000)
   }
 
   return (
@@ -100,6 +120,28 @@ export const Header: React.FC = () => {
           onClick={() => setSamplesModalOpen(true)}
         >
           Sample Demos
+        </Button>
+
+        <Button
+          data-action="import-data"
+          variant="secondary"
+          size="xs"
+          icon={<Upload size={13} className="text-emerald-400" />}
+          onClick={() => setImportModalOpen(true)}
+          title="Import CSV or JSON Dataset"
+        >
+          Import Data
+        </Button>
+
+        <Button
+          data-action="share-fiddle"
+          variant="secondary"
+          size="xs"
+          icon={copiedFiddle ? <Check size={13} className="text-emerald-400" /> : <Share2 size={13} className="text-cyan-400" />}
+          onClick={handleShareFiddle}
+          title="Share SQL Fiddle URL via compressed hash"
+        >
+          {copiedFiddle ? 'Link Copied!' : 'Share Fiddle'}
         </Button>
 
         <Button

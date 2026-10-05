@@ -6,6 +6,7 @@ export interface ModalProps {
   onClose: () => void
   title: string
   subtitle?: string
+  icon?: React.ReactNode
   children: React.ReactNode
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
 }
@@ -15,6 +16,7 @@ export const Modal: React.FC<ModalProps> = ({
   onClose,
   title,
   subtitle,
+  icon,
   children,
   maxWidth = 'md',
 }) => {
@@ -45,9 +47,12 @@ export const Modal: React.FC<ModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-800/80 bg-slate-900/60">
-          <div>
-            <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
-            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+          <div className="flex items-center gap-2.5">
+            {icon && <div className="shrink-0">{icon}</div>}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-100">{title}</h3>
+              {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            </div>
           </div>
           <button
             data-modal-close="true"

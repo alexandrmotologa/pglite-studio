@@ -270,52 +270,55 @@ async function fetchCatalog(id: string) {
       ORDER BY table_schema, table_name;
     `)
 
-    // 3. Columns
+    // 3. Columns (Optimized via pg_catalog)
     const colsRes = await db.query<{
       table_schema: string
       table_name: string
       column_name: string
       data_type: string
       udt_name: string
-      is_nullable: string
+      is_nullable: boolean
       column_default: string | null
-      full_type: string | null
     }>(`
       SELECT
-        c.table_schema,
-        c.table_name,
-        c.column_name,
-        c.data_type,
-        c.udt_name,
-        c.is_nullable,
-        c.column_default,
-        pg_catalog.format_type(a.atttypid, a.atttypmod) as full_type
-      FROM information_schema.columns c
-      LEFT JOIN pg_catalog.pg_class cl ON cl.relname = c.table_name
-      LEFT JOIN pg_catalog.pg_namespace n ON n.oid = cl.relnamespace AND n.nspname = c.table_schema
-      LEFT JOIN pg_catalog.pg_attribute a ON a.attrelid = cl.oid AND a.attname = c.column_name
-      WHERE c.table_schema NOT IN ('pg_catalog', 'information_schema')
-      ORDER BY c.table_schema, c.table_name, c.ordinal_position;
+        n.nspname AS table_schema,
+        c.relname AS table_name,
+        a.attname AS column_name,
+        pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
+        t.typname AS udt_name,
+        NOT a.attnotnull AS is_nullable,
+        pg_get_expr(d.adbin, d.adrelid) AS column_default
+      FROM pg_catalog.pg_attribute a
+      JOIN pg_catalog.pg_class c ON c.oid = a.attrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_catalog.pg_type t ON t.oid = a.atttypid
+      LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+      WHERE a.attnum > 0
+        AND NOT a.attisdropped
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema')
+        AND c.relkind IN ('r', 'v', 'm', 'p')
+      ORDER BY n.nspname, c.relname, a.attnum;
     `)
 
-    // 4. Primary Keys
+    // 4. Primary Keys (Optimized via pg_catalog)
     const pksRes = await db.query<{
       table_schema: string
       table_name: string
       column_name: string
     }>(`
       SELECT
-        tc.table_schema,
-        tc.table_name,
-        kcu.column_name
-      FROM information_schema.table_constraints tc
-      JOIN information_schema.key_column_usage kcu
-        ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-      WHERE tc.constraint_type = 'PRIMARY KEY';
+        n.nspname AS table_schema,
+        c.relname AS table_name,
+        a.attname AS column_name
+      FROM pg_catalog.pg_constraint con
+      JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY(con.conkey)
+      WHERE con.contype = 'p'
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema');
     `)
 
-    // 5. Foreign Keys
+    // 5. Foreign Keys (Optimized via pg_catalog)
     const fksRes = await db.query<{
       table_schema: string
       table_name: string
@@ -324,19 +327,19 @@ async function fetchCatalog(id: string) {
       foreign_column_name: string
     }>(`
       SELECT
-        tc.table_schema,
-        tc.table_name,
-        kcu.column_name,
-        ccu.table_name AS foreign_table_name,
-        ccu.column_name AS foreign_column_name
-      FROM information_schema.table_constraints tc
-      JOIN information_schema.key_column_usage kcu
-        ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-      JOIN information_schema.constraint_column_usage ccu
-        ON ccu.constraint_name = tc.constraint_name
-        AND ccu.table_schema = tc.table_schema
-      WHERE tc.constraint_type = 'FOREIGN KEY';
+        n.nspname AS table_schema,
+        c.relname AS table_name,
+        a.attname AS column_name,
+        c_target.relname AS foreign_table_name,
+        a_target.attname AS foreign_column_name
+      FROM pg_catalog.pg_constraint con
+      JOIN pg_catalog.pg_class c ON c.oid = con.conrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+      JOIN pg_catalog.pg_class c_target ON c_target.oid = con.confrelid
+      JOIN pg_catalog.pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = ANY(con.conkey)
+      JOIN pg_catalog.pg_attribute a_target ON a_target.attrelid = con.confrelid AND a_target.attnum = ANY(con.confkey)
+      WHERE con.contype = 'f'
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema');
     `)
 
     // 6. Indexes
@@ -412,11 +415,11 @@ async function fetchCatalog(id: string) {
       const fk = fksByCol.get(colKey)
 
       const isVector =
-        col.data_type === 'USER-DEFINED' && (col.udt_name === 'vector' || (col.full_type?.includes('vector') ?? false))
+        col.udt_name === 'vector' || (col.data_type?.includes('vector') ?? false)
 
       let vectorDimensions: number | undefined
-      if (isVector && col.full_type) {
-        const match = col.full_type.match(/vector\((\d+)\)/)
+      if (isVector && col.data_type) {
+        const match = col.data_type.match(/vector\((\d+)\)/)
         if (match) {
           vectorDimensions = parseInt(match[1], 10)
         }
@@ -424,8 +427,8 @@ async function fetchCatalog(id: string) {
 
       arr.push({
         name: col.column_name,
-        dataType: col.full_type || col.data_type,
-        isNullable: col.is_nullable === 'YES',
+        dataType: col.data_type,
+        isNullable: Boolean(col.is_nullable),
         defaultValue: col.column_default,
         isPrimaryKey: pkList.includes(col.column_name),
         isForeignKey: !!fk,

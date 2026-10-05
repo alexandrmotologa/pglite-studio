@@ -10,20 +10,25 @@ import { DataGrid } from './components/Results/DataGrid'
 import { ExplainPlanView } from './components/Results/ExplainPlanView'
 import { VectorScatterView } from './components/Results/VectorScatterView'
 import { MessagesLog } from './components/Results/MessagesLog'
+import { ERDiagramView } from './components/Results/ERDiagramView'
 import { BranchModal } from './components/Modals/BranchModal'
 import { MockGeneratorModal } from './components/Modals/MockGeneratorModal'
 import { ExportModal } from './components/Modals/ExportModal'
 import { SampleQueriesModal } from './components/Modals/SampleQueriesModal'
 import { HistoryModal } from './components/Modals/HistoryModal'
+import { JsonInspectorModal } from './components/Modals/JsonInspectorModal'
+import { ImportDataModal } from './components/Modals/ImportDataModal'
+import { VectorAssistantModal } from './components/Modals/VectorAssistantModal'
 import { useDbStore } from './store/dbStore'
 import { useEditorStore } from './store/editorStore'
 import { useUIStore } from './store/uiStore'
 import { formatSql } from './utils/sqlFormatter'
+import LZString from 'lz-string'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 export const App: React.FC = () => {
   const { init, runQuery, runExplain, status } = useDbStore()
-  const { getActiveTab, updateSql, addToHistory } = useEditorStore()
+  const { getActiveTab, updateSql, addToHistory, getExecutableSql, addTab } = useEditorStore()
   const { activeResultTab, setActiveResultTab, isSidebarOpen, toggleSidebar } = useUIStore()
 
   const [editorHeight, setEditorHeight] = useState<number>(45) // percentage
@@ -31,11 +36,26 @@ export const App: React.FC = () => {
   useEffect(() => {
     // Initialize PostgreSQL engine on mount
     init('main', 'idb')
-  }, [init])
+
+    // Check for shared SQL fiddle in URL hash
+    if (window.location.hash.startsWith('#fiddle=')) {
+      try {
+        const raw = window.location.hash.slice(8)
+        const decompressed = LZString.decompressFromEncodedURIComponent(raw)
+        if (decompressed) {
+          const payload = JSON.parse(decompressed)
+          if (payload && payload.sql) {
+            addTab(payload.title || 'Shared Query.sql', payload.sql)
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to parse URL fiddle:', err)
+      }
+    }
+  }, [init, addTab])
 
   const handleRunQuery = async () => {
-    const activeTab = getActiveTab()
-    const sql = activeTab.sql.trim()
+    const sql = getExecutableSql().trim()
     if (!sql) return
 
     const start = performance.now()
@@ -69,8 +89,7 @@ export const App: React.FC = () => {
   }
 
   const handleExplain = async () => {
-    const activeTab = getActiveTab()
-    const sql = activeTab.sql.trim()
+    const sql = getExecutableSql().trim()
     if (!sql) return
 
     const start = performance.now()
@@ -135,7 +154,11 @@ export const App: React.FC = () => {
               onFormat={handleFormat}
             />
             <div className="flex-1 overflow-hidden">
-              <SqlEditor onRun={handleRunQuery} onExplain={handleExplain} />
+              <SqlEditor
+                onRun={handleRunQuery}
+                onExplain={handleExplain}
+                onFormat={handleFormat}
+              />
             </div>
           </div>
 
@@ -167,6 +190,7 @@ export const App: React.FC = () => {
               {activeResultTab === 'table' && <DataGrid />}
               {activeResultTab === 'explain' && <ExplainPlanView />}
               {activeResultTab === 'vector' && <VectorScatterView />}
+              {activeResultTab === 'erd' && <ERDiagramView />}
               {activeResultTab === 'messages' && <MessagesLog />}
             </div>
           </div>
@@ -182,6 +206,9 @@ export const App: React.FC = () => {
       <ExportModal />
       <SampleQueriesModal />
       <HistoryModal />
+      <JsonInspectorModal />
+      <ImportDataModal />
+      <VectorAssistantModal />
     </div>
   )
 }

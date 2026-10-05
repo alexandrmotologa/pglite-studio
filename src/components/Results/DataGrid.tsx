@@ -14,22 +14,60 @@ import {
   ArrowUp,
   ArrowDown,
   Download,
-  Copy,
   Check,
   Search,
   ChevronLeft,
   ChevronRight,
   Database,
   FileSpreadsheet,
+  FileJson,
+  Undo2,
+  Save,
 } from 'lucide-react'
 import { useDbStore } from '../../store/dbStore'
+import { useUIStore } from '../../store/uiStore'
 import { Button } from '../UI/Button'
 
+interface StagedEdit {
+  rowIdx: number
+  rowIdVal: unknown
+  col: string
+  oldVal: unknown
+  newVal: string
+}
+
 export const DataGrid: React.FC = () => {
-  const { activeResult, lastExecutionMs } = useDbStore()
+  const { activeResult, lastExecutionMs, runQuery, refreshCatalog } = useDbStore()
+  const { setJsonInspector } = useUIStore()
+
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState('')
   const [copiedCell, setCopiedCell] = useState<string | null>(null)
+
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState<{
+    rowIdx: number
+    colName: string
+    currentVal: string
+  } | null>(null)
+  const [stagedEdits, setStagedEdits] = useState<StagedEdit[]>([])
+  const [isApplyingEdits, setIsApplyingEdits] = useState(false)
+
+  // Helper to test if string is JSON
+  const tryParseJson = (val: unknown): unknown | null => {
+    if (typeof val === 'object' && val !== null) return val
+    if (typeof val === 'string') {
+      const trimmed = val.trim()
+      if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+        try {
+          return JSON.parse(trimmed)
+        } catch {
+          return null
+        }
+      }
+    }
+    return null
+  }
 
   const columns = useMemo<ColumnDef<Record<string, unknown>>[]>(() => {
     if (!activeResult || activeResult.columns.length === 0) return []
@@ -38,6 +76,29 @@ export const DataGrid: React.FC = () => {
       header: colName,
       cell: (info) => {
         const val = info.getValue()
+        const parsedJson = tryParseJson(val)
+
+        if (parsedJson !== null) {
+          return (
+            <div className="flex items-center gap-1.5 min-w-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setJsonInspector(true, { title: colName, json: parsedJson })
+                }}
+                className="px-1.5 py-0.5 bg-amber-950/80 text-amber-300 hover:bg-amber-900 border border-amber-800/80 rounded text-[10px] font-mono flex items-center gap-1 shrink-0"
+                title="Open interactive JSON Inspector"
+              >
+                <FileJson size={11} />
+                JSON
+              </button>
+              <span className="font-mono text-xs text-amber-300/80 truncate">
+                {typeof val === 'object' ? JSON.stringify(val) : String(val)}
+              </span>
+            </div>
+          )
+        }
+
         if (val === null || val === undefined) {
           return <span className="text-slate-500 italic font-mono text-xs">null</span>
         }
@@ -52,13 +113,10 @@ export const DataGrid: React.FC = () => {
             </span>
           )
         }
-        if (typeof val === 'object') {
-          return <span className="font-mono text-xs text-amber-300">{JSON.stringify(val)}</span>
-        }
         return <span className="font-mono text-xs text-slate-200">{String(val)}</span>
       },
     }))
-  }, [activeResult])
+  }, [activeResult, setJsonInspector])
 
   const table = useReactTable({
     data: activeResult?.rows ?? [],
@@ -121,13 +179,71 @@ export const DataGrid: React.FC = () => {
     a.click()
   }
 
+  const handleCommitInlineEdit = () => {
+    if (!editingCell || !activeResult) return
+    const row = activeResult.rows[editingCell.rowIdx]
+    const oldVal = row ? row[editingCell.colName] : null
+    const rowIdVal = row ? (row['id'] ?? row['ID'] ?? row['_id']) : null
+
+    if (String(oldVal ?? '') !== editingCell.currentVal) {
+      setStagedEdits((prev) => [
+        ...prev.filter(
+          (e) => !(e.rowIdx === editingCell.rowIdx && e.col === editingCell.colName)
+        ),
+        {
+          rowIdx: editingCell.rowIdx,
+          rowIdVal,
+          col: editingCell.colName,
+          oldVal,
+          newVal: editingCell.currentVal,
+        },
+      ])
+    }
+    setEditingCell(null)
+  }
+
+  const handleApplyStagedEdits = async () => {
+    if (stagedEdits.length === 0 || !activeResult) return
+    setIsApplyingEdits(true)
+
+    try {
+      // Find table name if possible from command or active table
+      const statements: string[] = []
+      for (const edit of stagedEdits) {
+        if (edit.rowIdVal !== undefined && edit.rowIdVal !== null) {
+          // If we have an id column, we can generate a safe UPDATE
+          const valSql = isNaN(Number(edit.newVal))
+            ? `'${edit.newVal.replace(/'/g, "''")}'`
+            : edit.newVal
+
+          statements.push(
+            `-- Staged inline edit\nUPDATE documents SET "${edit.col}" = ${valSql} WHERE id = ${edit.rowIdVal};`
+          )
+        }
+      }
+
+      if (statements.length > 0) {
+        await runQuery(statements.join('\n'))
+        await refreshCatalog()
+        setStagedEdits([])
+      } else {
+        alert('Inline UPDATE requires an identifiable primary key or "id" column in the query result.')
+      }
+    } catch (err) {
+      alert(`Failed to apply staged updates: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setIsApplyingEdits(false)
+    }
+  }
+
   if (!activeResult) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2 p-4 select-none">
         <Database size={32} className="text-slate-600" />
         <p className="text-sm">No query results yet</p>
         <p className="text-xs text-slate-600">
-          Write a SQL query in the editor and click <span className="text-cyan-400 font-mono">Run</span> or press <kbd className="px-1 py-0.5 bg-slate-900 border border-slate-700 rounded text-slate-400">Ctrl+Enter</kbd>
+          Write a SQL query in the editor and click <span className="text-cyan-400 font-mono">Run</span> or press{' '}
+          <kbd className="px-1 py-0.5 bg-slate-900 border border-slate-700 rounded text-slate-400">Ctrl+Enter</kbd>
         </p>
       </div>
     )
@@ -196,7 +312,9 @@ export const DataGrid: React.FC = () => {
                       className="px-3 py-1.5 text-xs font-semibold text-slate-300 border-r border-slate-800/80 cursor-pointer hover:bg-slate-800/80 select-none transition-colors"
                     >
                       <div className="flex items-center justify-between gap-1">
-                        <span className="truncate">{flexRender(header.column.columnDef.header, header.getContext())}</span>
+                        <span className="truncate">
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </span>
                         <span className="text-slate-500 shrink-0">
                           {isSorted === 'asc' ? (
                             <ArrowUp size={12} className="text-cyan-400" />
@@ -215,31 +333,64 @@ export const DataGrid: React.FC = () => {
           </thead>
           <tbody className="divide-y divide-slate-800/60">
             {table.getRowModel().rows.map((row, rowIdx) => (
-              <tr
-                key={row.id}
-                className="hover:bg-slate-900/50 transition-colors group"
-              >
+              <tr key={row.id} className="hover:bg-slate-900/50 transition-colors group">
                 <td className="px-2 py-1 text-[11px] font-mono text-slate-600 border-r border-slate-800/60 text-center select-none">
                   {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + rowIdx + 1}
                 </td>
                 {row.getVisibleCells().map((cell) => {
                   const cellId = `${row.id}_${cell.column.id}`
                   const isCopied = copiedCell === cellId
+                  const isEditing =
+                    editingCell?.rowIdx === rowIdx && editingCell?.colName === cell.column.id
+
                   return (
                     <td
                       key={cell.id}
                       onClick={() => handleCopyCell(cell.getValue(), cellId)}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        const rawVal = cell.getValue()
+                        setEditingCell({
+                          rowIdx,
+                          colName: cell.column.id,
+                          currentVal: String(rawVal ?? ''),
+                        })
+                      }}
                       className="px-3 py-1 text-xs border-r border-slate-800/60 truncate max-w-xs cursor-pointer hover:bg-slate-800/70 relative transition-colors"
-                      title="Click to copy cell value"
+                      title="Click to copy, double-click to edit"
                     >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="truncate">{flexRender(cell.column.columnDef.cell, cell.getContext())}</div>
-                        {isCopied && (
-                          <span className="text-[10px] text-cyan-400 font-sans flex items-center gap-0.5 shrink-0 bg-slate-900 px-1 rounded shadow">
-                            <Check size={10} /> Copied
-                          </span>
-                        )}
-                      </div>
+                      {isEditing ? (
+                        <div onClick={(e) => e.stopPropagation()} className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            autoFocus
+                            value={editingCell.currentVal}
+                            onChange={(e) =>
+                              setEditingCell({
+                                ...editingCell,
+                                currentVal: e.target.value,
+                              })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleCommitInlineEdit()
+                              if (e.key === 'Escape') setEditingCell(null)
+                            }}
+                            onBlur={handleCommitInlineEdit}
+                            className="w-full bg-slate-950 text-slate-100 px-1 py-0.5 text-xs rounded border border-cyan-400 outline-none font-mono"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="truncate">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </div>
+                          {isCopied && (
+                            <span className="text-[10px] text-cyan-400 font-sans flex items-center gap-0.5 shrink-0 bg-slate-900 px-1 rounded shadow">
+                              <Check size={10} /> Copied
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                   )
                 })}
@@ -248,6 +399,36 @@ export const DataGrid: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Staged Changes Action Bar */}
+      {stagedEdits.length > 0 && (
+        <div className="h-10 bg-cyan-950/90 border-t border-cyan-800/80 px-4 flex items-center justify-between shrink-0 select-none text-xs">
+          <div className="flex items-center gap-2 text-cyan-300">
+            <span className="font-semibold">{stagedEdits.length} staged change(s)</span>
+            <span className="text-cyan-400/70">• Double-click cells to modify values</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="xs"
+              icon={<Undo2 size={12} />}
+              onClick={() => setStagedEdits([])}
+              disabled={isApplyingEdits}
+            >
+              Discard
+            </Button>
+            <Button
+              variant="primary"
+              size="xs"
+              icon={<Save size={12} />}
+              onClick={handleApplyStagedEdits}
+              disabled={isApplyingEdits}
+            >
+              {isApplyingEdits ? 'Applying...' : 'Apply Changes'}
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Pagination Footer */}
       {table.getPageCount() > 1 && (

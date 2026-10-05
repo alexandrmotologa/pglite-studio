@@ -7,6 +7,9 @@ export interface EditorTab {
   sql: string
 }
 
+const STORAGE_KEY_TABS = 'pglite_studio_tabs_v1'
+const STORAGE_KEY_ACTIVE = 'pglite_studio_active_tab_v1'
+
 const DEFAULT_SQL = `-- PGLite-Studio: In-Browser PostgreSQL 16 + pgvector Sandbox
 CREATE EXTENSION IF NOT EXISTS vector;
 
@@ -41,32 +44,79 @@ ORDER BY embedding <=> '[0.85, 0.40, 0.20]'
 LIMIT 10;
 `
 
+function loadInitialTabs(): EditorTab[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_TABS)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return [
+    {
+      id: 'tab-1',
+      title: 'Vector Sandbox.sql',
+      sql: DEFAULT_SQL,
+    },
+  ]
+}
+
+function loadInitialActiveTab(tabs: EditorTab[]): string {
+  try {
+    const active = localStorage.getItem(STORAGE_KEY_ACTIVE)
+    if (active && tabs.some((t) => t.id === active)) {
+      return active
+    }
+  } catch {
+    // fallback
+  }
+  return tabs[0]?.id || 'tab-1'
+}
+
+function persistTabs(tabs: EditorTab[], activeTabId: string) {
+  try {
+    localStorage.setItem(STORAGE_KEY_TABS, JSON.stringify(tabs))
+    localStorage.setItem(STORAGE_KEY_ACTIVE, activeTabId)
+  } catch {
+    // localStorage quota or disabled
+  }
+}
+
 interface EditorState {
   tabs: EditorTab[]
   activeTabId: string
+  selectedText: string
   history: QueryHistoryItem[]
 
   // Actions
   setActiveTab: (id: string) => void
   addTab: (title?: string, sql?: string) => void
   closeTab: (id: string) => void
+  renameTab: (id: string, title: string) => void
   updateSql: (sql: string) => void
+  setSelectedText: (text: string) => void
   addToHistory: (item: Omit<QueryHistoryItem, 'id' | 'timestamp'>) => void
   getActiveTab: () => EditorTab
+  getExecutableSql: () => string
 }
 
+const initialTabs = loadInitialTabs()
+const initialActive = loadInitialActiveTab(initialTabs)
+
 export const useEditorStore = create<EditorState>((set, get) => ({
-  tabs: [
-    {
-      id: 'tab-1',
-      title: 'Vector Sandbox.sql',
-      sql: DEFAULT_SQL,
-    },
-  ],
-  activeTabId: 'tab-1',
+  tabs: initialTabs,
+  activeTabId: initialActive,
+  selectedText: '',
   history: [],
 
-  setActiveTab: (id: string) => set({ activeTabId: id }),
+  setActiveTab: (id: string) => {
+    set({ activeTabId: id })
+    persistTabs(get().tabs, id)
+  },
 
   addTab: (title?: string, sql?: string) => {
     const count = get().tabs.length + 1
@@ -76,10 +126,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       title: title || `Query ${count}.sql`,
       sql: sql || 'SELECT * FROM pg_catalog.pg_tables WHERE schemaname = \'public\';',
     }
-    set((state) => ({
-      tabs: [...state.tabs, newTab],
+    const updated = [...get().tabs, newTab]
+    set({
+      tabs: updated,
       activeTabId: newId,
-    }))
+    })
+    persistTabs(updated, newId)
   },
 
   closeTab: (id: string) => {
@@ -91,14 +143,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       nextActive = filtered[filtered.length - 1].id
     }
     set({ tabs: filtered, activeTabId: nextActive })
+    persistTabs(filtered, nextActive)
+  },
+
+  renameTab: (id: string, title: string) => {
+    const cleanTitle = title.trim() || 'Query.sql'
+    const updated = get().tabs.map((t) => (t.id === id ? { ...t, title: cleanTitle } : t))
+    set({ tabs: updated })
+    persistTabs(updated, get().activeTabId)
   },
 
   updateSql: (sql: string) => {
     const { activeTabId, tabs } = get()
-    set({
-      tabs: tabs.map((t) => (t.id === activeTabId ? { ...t, sql } : t)),
-    })
+    const updated = tabs.map((t) => (t.id === activeTabId ? { ...t, sql } : t))
+    set({ tabs: updated })
+    persistTabs(updated, activeTabId)
   },
+
+  setSelectedText: (text: string) => set({ selectedText: text }),
 
   addToHistory: (item) => {
     const historyItem: QueryHistoryItem = {
@@ -114,5 +176,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   getActiveTab: () => {
     const { tabs, activeTabId } = get()
     return tabs.find((t) => t.id === activeTabId) || tabs[0]
+  },
+
+  getExecutableSql: () => {
+    const selected = get().selectedText.trim()
+    if (selected.length > 0) {
+      return selected
+    }
+    return get().getActiveTab().sql
   },
 }))

@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 
-export type ResultTabType = 'table' | 'explain' | 'vector' | 'messages'
+export type ResultTabType = 'table' | 'explain' | 'vector' | 'erd' | 'messages'
+
+export interface JsonInspectorData {
+  title: string
+  json: unknown
+}
 
 interface UIState {
   activeResultTab: ResultTabType
@@ -15,6 +20,10 @@ interface UIState {
   exportModalOpen: boolean
   samplesModalOpen: boolean
   historyModalOpen: boolean
+  importModalOpen: boolean
+  jsonInspectorOpen: boolean
+  jsonInspectorData: JsonInspectorData | null
+  vectorAssistantModalOpen: boolean
 
   // Actions
   setActiveResultTab: (tab: ResultTabType) => void
@@ -26,6 +35,9 @@ interface UIState {
   setExportModalOpen: (open: boolean) => void
   setSamplesModalOpen: (open: boolean) => void
   setHistoryModalOpen: (open: boolean) => void
+  setImportModalOpen: (open: boolean) => void
+  setJsonInspector: (open: boolean, data?: JsonInspectorData) => void
+  setVectorAssistantModalOpen: (open: boolean) => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -40,6 +52,10 @@ export const useUIStore = create<UIState>((set) => ({
   exportModalOpen: false,
   samplesModalOpen: false,
   historyModalOpen: false,
+  importModalOpen: false,
+  jsonInspectorOpen: false,
+  jsonInspectorData: null,
+  vectorAssistantModalOpen: false,
 
   setActiveResultTab: (tab) => set({ activeResultTab: tab }),
   toggleSidebar: () => set((state) => ({ isSidebarOpen: !state.isSidebarOpen })),
@@ -51,4 +67,8 @@ export const useUIStore = create<UIState>((set) => ({
   setExportModalOpen: (open) => set({ exportModalOpen: open }),
   setSamplesModalOpen: (open) => set({ samplesModalOpen: open }),
   setHistoryModalOpen: (open) => set({ historyModalOpen: open }),
+  setImportModalOpen: (open) => set({ importModalOpen: open }),
+  setJsonInspector: (open, data) =>
+    set({ jsonInspectorOpen: open, jsonInspectorData: data || null }),
+  setVectorAssistantModalOpen: (open) => set({ vectorAssistantModalOpen: open }),
 }))

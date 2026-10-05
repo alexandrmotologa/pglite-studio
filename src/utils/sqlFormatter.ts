@@ -1,22 +1,21 @@
+import { format } from 'sql-formatter'
+
 /**
- * Formats SQL keywords into standard indentation and uppercase keywords
+ * Formats SQL queries using the official PostgreSQL dialect
+ * with consistent indentation and uppercase keywords.
  */
 export function formatSql(sql: string): string {
-  const keywords = [
-    'SELECT', 'FROM', 'WHERE', 'AND', 'OR', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN',
-    'INNER JOIN', 'OUTER JOIN', 'CROSS JOIN', 'ON', 'GROUP BY', 'HAVING',
-    'ORDER BY', 'LIMIT', 'OFFSET', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET',
-    'DELETE FROM', 'CREATE TABLE', 'DROP TABLE', 'ALTER TABLE', 'CREATE INDEX',
-    'CREATE EXTENSION', 'WITH', 'UNION', 'UNION ALL', 'EXPLAIN'
-  ]
+  if (!sql || !sql.trim()) return ''
 
-  let formatted = sql.trim()
-
-  // Capitalize common keywords
-  keywords.forEach((kw) => {
-    const regex = new RegExp(`\\b${kw}\\b`, 'gi')
-    formatted = formatted.replace(regex, kw)
-  })
-
-  return formatted
+  try {
+    return format(sql, {
+      language: 'postgresql',
+      tabWidth: 2,
+      keywordCase: 'upper',
+      linesBetweenQueries: 2,
+    })
+  } catch {
+    // If formatting fails on custom edge-case syntax, return raw trimmed SQL safely
+    return sql.trim()
+  }
 }
