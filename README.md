@@ -1,24 +1,45 @@
-# PGLite-Studio
+<p align="center">
+  <img src="docs/images/logo.png?raw=true" alt="PGLite Studio Mascot Logo" width="130" style="border-radius: 24px;" />
+</p>
 
-Client-side PostgreSQL 16 and pgvector workbench running entirely in browser WebAssembly via ElectricSQL's PGlite.
+<h1 align="center">PGLite Studio</h1>
 
-![PGLite-Studio Demo](docs/images/pglite_studio_demo.gif)
+<p align="center">
+  <img src="https://img.shields.io/badge/PostgreSQL-16_WASM-336791?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 16 WASM" />
+  <img src="https://img.shields.io/badge/pgvector-0.8.1-0ea5e9?style=flat-square" alt="pgvector" />
+  <img src="https://img.shields.io/badge/Runtime-Browser_WebWorker-10b981?style=flat-square" alt="Browser WebWorker" />
+  <img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/TypeScript-Strict-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/License-MIT-amber?style=flat-square" alt="MIT License" />
+</p>
+
+<p align="center">
+  Client-side PostgreSQL 16 and pgvector workbench running entirely in browser WebAssembly via ElectricSQL's PGlite.
+</p>
+
+<p align="center">
+  <img src="docs/images/pglite_studio_demo.gif" alt="PGLite Studio Live Demo" width="100%" />
+</p>
 
 PGLite-Studio lets developers prototype schemas, test vector similarity queries, analyze execution plans, and test database migrations without starting local Docker containers or sending data to remote database instances.
 
 ## Screenshots
 
-| Visual EXPLAIN Plan DAG | Entity-Relationship (ER) Graph |
+| Interactive Data Grid | Visual EXPLAIN Plan DAG |
 | :---: | :---: |
-| ![EXPLAIN DAG](docs/images/pglite-studio-2.png) | ![ER Diagram](docs/images/pglite-studio-erd.png) |
+| ![Data Grid](docs/images/pglite-studio-1.png) | ![EXPLAIN DAG](docs/images/pglite-studio-2.png) |
 
-| 2D/3D PCA Vector Scatter | pgvector Geometric Calculator |
+| Interactive ER Diagram | 2D/3D PCA Vector Scatter |
 | :---: | :---: |
-| ![Vector Scatter](docs/images/pglite-studio-3.png) | ![Vector Calculator](docs/images/pglite-studio-vector-calc.png) |
+| ![ER Diagram](docs/images/pglite-studio-erd.png) | ![Vector Scatter](docs/images/pglite-studio-3.png) |
 
-| Interactive Data Grid | Drag & Drop Dataset Ingestion |
+| pgvector Geometric Calculator | Drag & Drop Dataset Ingestion |
 | :---: | :---: |
-| ![Data Grid](docs/images/pglite-studio-1.png) | ![Import Data](docs/images/pglite-studio-import.png) |
+| ![Vector Calculator](docs/images/pglite-studio-vector-calc.png) | ![Import Data](docs/images/pglite-studio-import.png) |
+
+| Sample Workbenches & Presets |
+| :---: |
+| ![Sample Queries](docs/images/pglite-studio-4.png) |
 
 ## Highlights
 
