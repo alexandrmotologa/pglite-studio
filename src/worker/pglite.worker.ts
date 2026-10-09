@@ -6,7 +6,6 @@ import { WorkerRequest, WorkerResponse } from '../types/messages'
 
 let db: PGlite | null = null
 let currentBranchId = 'main'
-let currentStorageType: 'idb' | 'memory' = 'idb'
 
 // Custom vector extension loader resolving from /vector.pkg in public root
 const vectorExtension: Extension = {
@@ -22,10 +21,6 @@ const vectorExtension: Extension = {
 
 function sendResponse(res: WorkerResponse) {
   postMessage(res)
-}
-
-function sendNotice(message: string, severity = 'INFO') {
-  sendResponse({ type: 'NOTICE', message, severity })
 }
 
 function detectVectorValue(val: unknown): boolean {
@@ -87,7 +82,6 @@ async function initDatabase(branchId: string, storageType: 'idb' | 'memory') {
   }
 
   currentBranchId = branchId
-  currentStorageType = storageType
   const dataDir = storageType === 'idb' ? `idb://pglite-studio-${branchId}` : undefined
 
   try {
@@ -153,6 +147,9 @@ async function runQuery(id: string, sql: string) {
         }
       }
 
+      const fromMatch = strippedLast.match(/\bFROM\s+["']?([a-zA-Z0-9_]+)["']?/i)
+      const targetTable = fromMatch ? fromMatch[1] : undefined
+
       const queryResult: QueryResult = {
         columns,
         rows,
@@ -161,6 +158,8 @@ async function runQuery(id: string, sql: string) {
         rowCount: rows.length,
         hasVectorColumn: vectorCols.length > 0,
         vectorColumns: vectorCols,
+        query: lastStmt,
+        targetTable,
       }
 
       sendResponse({ type: 'QUERY_OK', id, result: queryResult })
@@ -544,6 +543,10 @@ CREATE EXTENSION IF NOT EXISTS vector;
             const val = row[k]
             if (val === null || val === undefined) return 'NULL'
             if (typeof val === 'number' || typeof val === 'boolean') return String(val)
+            if (typeof val === 'object') {
+              const jsonStr = JSON.stringify(val).replace(/'/g, "''")
+              return `'${jsonStr}'`
+            }
             const strVal = String(val).replace(/'/g, "''")
             return `'${strVal}'`
           })
@@ -575,6 +578,26 @@ async function importSql(id: string, sql: string) {
   }
 }
 
+async function resetBranch(id: string, _branchId: string) {
+  if (!db) {
+    sendResponse({ type: 'RESET_ERROR', id, error: 'Database engine is not initialized' })
+    return
+  }
+
+  try {
+    await db.exec(`
+      DROP SCHEMA IF EXISTS public CASCADE;
+      CREATE SCHEMA public;
+      GRANT ALL ON SCHEMA public TO public;
+      CREATE EXTENSION IF NOT EXISTS vector;
+    `)
+    sendResponse({ type: 'RESET_OK', id })
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    sendResponse({ type: 'RESET_ERROR', id, error: errorMsg })
+  }
+}
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   const req = e.data
 
@@ -601,8 +624,7 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       await importSql(req.id, req.sql)
       break
     case 'RESET_BRANCH':
-      await initDatabase(req.branchId, currentStorageType)
-      sendResponse({ type: 'INIT_OK', branchId: req.branchId, extensions: ['vector'] })
+      await resetBranch(req.id, req.branchId)
       break
     default:
       break

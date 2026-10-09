@@ -28,12 +28,15 @@ interface DbState {
   runExplain: (sql: string) => Promise<void>
   refreshCatalog: () => Promise<void>
   switchBranch: (branchId: string) => Promise<void>
-  createBranch: (name: string) => Promise<void>
+  createBranch: (name: string, cloneCurrent?: boolean) => Promise<void>
   deleteBranch: (branchId: string) => Promise<void>
+  resetDatabase: () => Promise<void>
   cancelQuery: () => void
   addLog: (text: string, type?: LogMessage['type']) => void
   clearLogs: () => void
 }
+
+const STORAGE_KEY_BRANCHES = 'pglite_studio_branches_v1'
 
 const DEFAULT_BRANCH: Branch = {
   id: 'main',
@@ -43,11 +46,37 @@ const DEFAULT_BRANCH: Branch = {
   databaseName: 'pglite-studio-main',
 }
 
+function loadInitialBranches(): Branch[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_BRANCHES)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return [DEFAULT_BRANCH]
+}
+
+function persistBranches(branches: Branch[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY_BRANCHES, JSON.stringify(branches))
+  } catch {
+    // quota
+  }
+}
+
+const initialBranches = loadInitialBranches()
+const initialActiveBranch = initialBranches.find((b) => b.isCurrent)?.id || 'main'
+
 export const useDbStore = create<DbState>((set, get) => ({
   status: 'loading',
   errorMessage: null,
-  activeBranch: 'main',
-  branches: [DEFAULT_BRANCH],
+  activeBranch: initialActiveBranch,
+  branches: initialBranches,
   storageType: 'idb',
   catalog: null,
   activeResult: null,
@@ -81,11 +110,9 @@ export const useDbStore = create<DbState>((set, get) => ({
     if (!trimmed) throw new Error('Query cannot be empty')
 
     set({ status: 'running', errorMessage: null })
-    const startTime = Date.now()
 
     try {
       const result = await pgliteClient.query(trimmed)
-      const duration = Date.now() - startTime
 
       set({
         status: 'ready',
@@ -148,12 +175,22 @@ export const useDbStore = create<DbState>((set, get) => ({
       ...b,
       isCurrent: b.id === branchId,
     }))
+    persistBranches(branches)
     set({ branches, activeBranch: branchId })
     await get().init(branchId, get().storageType)
   },
 
-  createBranch: async (name: string) => {
+  createBranch: async (name: string, cloneCurrent = true) => {
     const id = name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+    let dump = ''
+    if (cloneCurrent) {
+      try {
+        dump = await pgliteClient.exportSql()
+      } catch {
+        // ignore dump error
+      }
+    }
+
     const newBranch: Branch = {
       id,
       name,
@@ -163,9 +200,20 @@ export const useDbStore = create<DbState>((set, get) => ({
     }
 
     const branches = get().branches.map((b) => ({ ...b, isCurrent: false })).concat(newBranch)
+    persistBranches(branches)
     set({ branches, activeBranch: id })
     get().addLog(`Created database branch '${name}'`, 'info')
     await get().init(id, get().storageType)
+
+    if (cloneCurrent && dump && dump.trim()) {
+      try {
+        await pgliteClient.importSql(dump)
+        await get().refreshCatalog()
+        get().addLog(`Cloned schema and data into branch '${name}'`, 'success')
+      } catch (err) {
+        console.warn('Failed to clone data into new branch:', err)
+      }
+    }
   },
 
   deleteBranch: async (branchId: string) => {
@@ -174,9 +222,30 @@ export const useDbStore = create<DbState>((set, get) => ({
       return
     }
     const filtered = get().branches.filter((b) => b.id !== branchId)
+    persistBranches(filtered)
     set({ branches: filtered })
     if (get().activeBranch === branchId) {
       await get().switchBranch('main')
+    }
+    try {
+      indexedDB.deleteDatabase(`pglite-studio-${branchId}`)
+    } catch {
+      // ignore
+    }
+  },
+
+  resetDatabase: async () => {
+    set({ status: 'running' })
+    try {
+      await pgliteClient.resetBranch()
+      set({ status: 'ready', activeResult: null, activeExplain: null })
+      get().addLog(`Reset database branch '${get().activeBranch}' to an empty state`, 'info')
+      await get().refreshCatalog()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ status: 'ready', errorMessage: msg })
+      get().addLog(`Reset error: ${msg}`, 'error')
+      throw err
     }
   },
 

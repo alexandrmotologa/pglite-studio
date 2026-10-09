@@ -5,7 +5,6 @@ import {
   Link2,
   Search,
   RefreshCw,
-  PlusCircle,
   Play,
   Trash2,
   Sparkles,
@@ -19,7 +18,7 @@ import {
 import { useDbStore } from '../../store/dbStore'
 import { useEditorStore } from '../../store/editorStore'
 import { useUIStore } from '../../store/uiStore'
-import { TableSchema, ColumnMeta } from '../../types/database'
+import { TableSchema } from '../../types/database'
 import { Badge } from '../UI/Badge'
 
 export const Sidebar: React.FC = () => {

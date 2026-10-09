@@ -21,7 +21,7 @@ import { useUIStore } from '../../store/uiStore'
 import { useEditorStore } from '../../store/editorStore'
 
 export const Header: React.FC = () => {
-  const { activeBranch, branches, switchBranch, init, storageType } = useDbStore()
+  const { activeBranch, branches, switchBranch, resetDatabase } = useDbStore()
   const {
     setBranchModalOpen,
     setExportModalOpen,
@@ -51,7 +51,7 @@ export const Header: React.FC = () => {
 
   const handleReset = async () => {
     if (confirm(`Reset branch '${activeBranch}' to an empty database state?`)) {
-      await init(activeBranch, storageType)
+      await resetDatabase()
     }
   }
 

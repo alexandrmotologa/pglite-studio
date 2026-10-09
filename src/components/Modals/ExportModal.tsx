@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Download, Upload, FileCode, CheckCircle2 } from 'lucide-react'
+import { Download, Upload, FileCode } from 'lucide-react'
 import { Modal } from '../UI/Modal'
 import { Button } from '../UI/Button'
 import { useDbStore } from '../../store/dbStore'

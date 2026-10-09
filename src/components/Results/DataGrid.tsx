@@ -37,7 +37,7 @@ interface StagedEdit {
 }
 
 export const DataGrid: React.FC = () => {
-  const { activeResult, lastExecutionMs, runQuery, refreshCatalog } = useDbStore()
+  const { activeResult, lastExecutionMs, runQuery, refreshCatalog, catalog } = useDbStore()
   const { setJsonInspector } = useUIStore()
 
   const [sorting, setSorting] = useState<SortingState>([])
@@ -183,7 +183,20 @@ export const DataGrid: React.FC = () => {
     if (!editingCell || !activeResult) return
     const row = activeResult.rows[editingCell.rowIdx]
     const oldVal = row ? row[editingCell.colName] : null
-    const rowIdVal = row ? (row['id'] ?? row['ID'] ?? row['_id']) : null
+
+    const targetTable =
+      activeResult.targetTable ||
+      (catalog?.tables.length === 1 ? catalog.tables[0].name : undefined)
+
+    const tableSchema = catalog?.tables.find(
+      (t) => t.name.toLowerCase() === targetTable?.toLowerCase()
+    )
+    const pkColName =
+      tableSchema?.primaryKey?.[0] ||
+      tableSchema?.columns.find((c) => c.isPrimaryKey)?.name ||
+      'id'
+
+    const rowIdVal = row ? (row[pkColName] ?? row['id'] ?? row['ID'] ?? row['_id']) : null
 
     if (String(oldVal ?? '') !== editingCell.currentVal) {
       setStagedEdits((prev) => [
@@ -207,17 +220,38 @@ export const DataGrid: React.FC = () => {
     setIsApplyingEdits(true)
 
     try {
-      // Find table name if possible from command or active table
+      const targetTable =
+        activeResult.targetTable ||
+        (catalog?.tables.length === 1 ? catalog.tables[0].name : undefined)
+
+      if (!targetTable) {
+        alert(
+          'Could not determine target table for inline updates. Please ensure your query queries a specific table (e.g. SELECT * FROM "tablename").'
+        )
+        return
+      }
+
+      const tableSchema = catalog?.tables.find(
+        (t) => t.name.toLowerCase() === targetTable.toLowerCase()
+      )
+      const pkColName =
+        tableSchema?.primaryKey?.[0] ||
+        tableSchema?.columns.find((c) => c.isPrimaryKey)?.name ||
+        'id'
+
       const statements: string[] = []
       for (const edit of stagedEdits) {
         if (edit.rowIdVal !== undefined && edit.rowIdVal !== null) {
-          // If we have an id column, we can generate a safe UPDATE
           const valSql = isNaN(Number(edit.newVal))
             ? `'${edit.newVal.replace(/'/g, "''")}'`
             : edit.newVal
 
+          const pkValSql = isNaN(Number(edit.rowIdVal))
+            ? `'${String(edit.rowIdVal).replace(/'/g, "''")}'`
+            : edit.rowIdVal
+
           statements.push(
-            `-- Staged inline edit\nUPDATE documents SET "${edit.col}" = ${valSql} WHERE id = ${edit.rowIdVal};`
+            `-- Staged inline edit\nUPDATE "${targetTable}" SET "${edit.col}" = ${valSql} WHERE "${pkColName}" = ${pkValSql};`
           )
         }
       }
@@ -227,7 +261,9 @@ export const DataGrid: React.FC = () => {
         await refreshCatalog()
         setStagedEdits([])
       } else {
-        alert('Inline UPDATE requires an identifiable primary key or "id" column in the query result.')
+        alert(
+          `Inline UPDATE requires an identifiable primary key or "${pkColName}" column in the query result.`
+        )
       }
     } catch (err) {
       alert(`Failed to apply staged updates: ${err instanceof Error ? err.message : String(err)}`)

@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { GitBranch, Plus, Trash2, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { GitBranch, Plus, Trash2, ShieldCheck } from 'lucide-react'
 import { Modal } from '../UI/Modal'
 import { Button } from '../UI/Button'
 import { Badge } from '../UI/Badge'

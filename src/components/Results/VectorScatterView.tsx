@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import {
   ScatterChart,
-  Eye,
-  RotateCw,
   Box,
   CircleDot,
   Compass,
   Sparkles,
-  Search,
-  Zap,
 } from 'lucide-react'
 import { useDbStore } from '../../store/dbStore'
 import { useEditorStore } from '../../store/editorStore'

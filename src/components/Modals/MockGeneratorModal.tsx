@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Sparkles, Table2, Layers, CheckCircle } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { Modal } from '../UI/Modal'
 import { Button } from '../UI/Button'
 import { useDbStore } from '../../store/dbStore'

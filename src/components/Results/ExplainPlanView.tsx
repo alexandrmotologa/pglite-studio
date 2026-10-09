@@ -18,7 +18,6 @@ import {
   Search,
   GitMerge,
   Filter,
-  CheckCircle,
 } from 'lucide-react'
 import { useDbStore } from '../../store/dbStore'
 import { parseExplainPlan } from '../../engine/explainParser'
@@ -130,7 +129,7 @@ const CustomExplainNode: React.FC<NodeProps> = (props) => {
 }
 
 export const ExplainPlanView: React.FC = () => {
-  const { activeExplain, runExplain } = useDbStore()
+  const { activeExplain } = useDbStore()
   const [selectedNodeData, setSelectedNodeData] = useState<ExplainNodeData | null>(null)
 
   const nodeTypes = useMemo(() => ({ explainNode: CustomExplainNode }), [])

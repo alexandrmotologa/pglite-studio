@@ -24,4 +24,6 @@ export type WorkerResponse =
   | { type: 'EXPORT_ERROR'; id: string; error: string }
   | { type: 'IMPORT_OK'; id: string; affectedQueries: number }
   | { type: 'IMPORT_ERROR'; id: string; error: string }
+  | { type: 'RESET_OK'; id: string }
+  | { type: 'RESET_ERROR'; id: string; error: string }
   | { type: 'NOTICE'; message: string; severity?: string }

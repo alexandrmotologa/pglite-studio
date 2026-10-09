@@ -56,6 +56,8 @@ export interface QueryResult {
   command?: string
   hasVectorColumn?: boolean
   vectorColumns?: string[]
+  query?: string
+  targetTable?: string
 }
 
 export interface Branch {

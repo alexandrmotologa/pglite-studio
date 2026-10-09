@@ -1,5 +1,5 @@
 import React from 'react'
-import { History, Play, CheckCircle2, AlertCircle, Clock } from 'lucide-react'
+import { Play, CheckCircle2, AlertCircle } from 'lucide-react'
 import { Modal } from '../UI/Modal'
 import { Button } from '../UI/Button'
 import { Badge } from '../UI/Badge'
@@ -7,7 +7,7 @@ import { useEditorStore } from '../../store/editorStore'
 import { useUIStore } from '../../store/uiStore'
 
 export const HistoryModal: React.FC = () => {
-  const { history, updateSql, addTab } = useEditorStore()
+  const { history, addTab } = useEditorStore()
   const { historyModalOpen, setHistoryModalOpen } = useUIStore()
 
   const handleLoad = (sql: string) => {

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react'
 import { Modal } from '../UI/Modal'
 import { useUIStore } from '../../store/uiStore'
 import { useEditorStore } from '../../store/editorStore'
+import { useDbStore } from '../../store/dbStore'
 import { Dna, Copy, Check, ArrowRight, Sparkles, Calculator } from 'lucide-react'
 import { Button } from '../UI/Button'
 
@@ -38,6 +39,7 @@ function parseVectorString(str: string): number[] | null {
 export const VectorAssistantModal: React.FC = () => {
   const { vectorAssistantModalOpen, setVectorAssistantModalOpen } = useUIStore()
   const { updateSql, getActiveTab } = useEditorStore()
+  const { catalog } = useDbStore()
 
   // Tab 1: Embeddings Generator
   const [inputText, setInputText] = useState('semantic vector retrieval and similarity')
@@ -107,7 +109,11 @@ export const VectorAssistantModal: React.FC = () => {
 
   const handleInsertQuery = () => {
     const activeTab = getActiveTab()
-    const query = `\n-- Semantic search with generated ${dimensions}-d embedding\nSELECT\n  id,\n  title,\n  embedding,\n  ROUND((1 - (embedding <=> '${vectorLiteral}'))::numeric, 4) AS similarity\nFROM documents\nORDER BY embedding <=> '${vectorLiteral}'\nLIMIT 10;\n`
+    const vectorTable = catalog?.tables.find((t) => t.columns.some((c) => c.isVector))
+    const tableName = vectorTable ? vectorTable.name : 'documents'
+    const vectorCol = vectorTable?.columns.find((c) => c.isVector)?.name || 'embedding'
+
+    const query = `\n-- Semantic search with generated ${dimensions}-d embedding\nSELECT\n  *,\n  ROUND((1 - ("${vectorCol}" <=> '${vectorLiteral}'))::numeric, 4) AS similarity\nFROM "${tableName}"\nORDER BY "${vectorCol}" <=> '${vectorLiteral}'\nLIMIT 10;\n`
     updateSql(activeTab.sql + query)
     setVectorAssistantModalOpen(false)
   }

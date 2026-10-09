@@ -1,7 +1,6 @@
 import React from 'react'
-import { BookOpen, Sparkles, ShoppingBag, Braces, Gauge, ArrowRight } from 'lucide-react'
+import { Sparkles, ShoppingBag, Braces, Gauge, ArrowRight } from 'lucide-react'
 import { Modal } from '../UI/Modal'
-import { Button } from '../UI/Button'
 import { Badge } from '../UI/Badge'
 import { useEditorStore } from '../../store/editorStore'
 import { useUIStore } from '../../store/uiStore'

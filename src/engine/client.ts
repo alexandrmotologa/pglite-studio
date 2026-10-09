@@ -104,6 +104,12 @@ export class PGLiteClient {
       case 'IMPORT_ERROR':
         pending.reject(new Error(msg.error))
         break
+      case 'RESET_OK':
+        pending.resolve(undefined)
+        break
+      case 'RESET_ERROR':
+        pending.reject(new Error(msg.error))
+        break
     }
   }
 
@@ -174,6 +180,11 @@ export class PGLiteClient {
   public async importSql(sql: string): Promise<number> {
     const id = `imp_sql_${Date.now()}`
     return this.send<number>({ type: 'IMPORT_SQL', id, sql })
+  }
+
+  public async resetBranch(): Promise<void> {
+    const id = `rst_${Date.now()}`
+    return this.send<void>({ type: 'RESET_BRANCH', id, branchId: this.currentBranch })
   }
 
   public cancelRunningQuery(): void {
